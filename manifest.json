@@ -1,0 +1,17 @@
+{
+  "name": "MPF Data Cleaner",
+  "short_name": "MPF Cleaner",
+  "description": "Remove Multi-Picture Format data from JPEG files locally directly from your browser.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0f0e13",
+  "theme_color": "#6366f1",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
