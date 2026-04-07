@@ -12,6 +12,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let directoryHandle = null;
     let foundJpgs = [];
     let filesWithMpf = [];
+    let scannedFileCount = 0;
+    let totalFilesToScan = 0;
 
     // Check if the API is supported
     if (!window.showDirectoryPicker) {
@@ -40,9 +42,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function scanDirectory(dirHandle) {
+        statusText.innerText = 'Counting total files...';
+        totalFilesToScan = await countFilesInDirectory(dirHandle);
         statusText.innerText = 'Scanning directory...';
         foundJpgs = [];
         filesWithMpf = [];
+        scannedFileCount = 0;
         fileListEl.innerHTML = '';
         statsRow.style.display = 'flex';
         cleanBtn.disabled = true;
@@ -63,9 +68,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    async function countFilesInDirectory(dirHandle) {
+        let count = 0;
+        for await (const entry of dirHandle.values()) {
+            if (entry.kind === 'file') {
+                count++;
+            } else if (entry.kind === 'directory') {
+                count += await countFilesInDirectory(entry);
+            }
+        }
+        return count;
+    }
+
     async function walkDirectory(dirHandle, path) {
         for await (const entry of dirHandle.values()) {
             if (entry.kind === 'file') {
+                scannedFileCount++;
+                statusText.innerText = `Scanning directory... (${scannedFileCount}/${totalFilesToScan} files checked)`;
+                if (totalFilesToScan > 0) {
+                    progressBar.style.width = `${(scannedFileCount / totalFilesToScan) * 100}%`;
+                }
+
+
                 if (entry.name.toLowerCase().endsWith('.jpg') || entry.name.toLowerCase().endsWith('.jpeg')) {
                     foundJpgs.push(entry);
                     await checkFileForMpf(entry, path);
@@ -91,11 +115,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
 
                 const li = document.createElement('li');
-                li.id = 'file-' + Array.from(new TextEncoder().encode(fileHandle.name)).map(b => b.toString(16)).join('');
-                li.innerHTML = `
-                    <span class="file-name">${path}${file.name}</span>
-                    <span class="file-badge">Has MPF</span>
-                `;
+                li.id = 'file-' + Array.from(new TextEncoder().encode(path + file.name)).map(b => b.toString(16)).join('');
+
+                const nameSpan = document.createElement('span');
+                nameSpan.className = 'file-name';
+                nameSpan.textContent = path + file.name;
+
+                const badgeSpan = document.createElement('span');
+                badgeSpan.className = 'file-badge';
+                badgeSpan.textContent = 'Has MPF';
+
+                li.appendChild(nameSpan);
+                li.appendChild(badgeSpan);
                 fileListEl.appendChild(li);
 
                 mpfFilesEl.innerText = filesWithMpf.length;
@@ -113,7 +144,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         for (let i = 0; i < filesToProcess.length; i++) {
             const fileItem = filesToProcess[i];
-            const domId = 'file-' + Array.from(new TextEncoder().encode(fileItem.handle.name)).map(b => b.toString(16)).join('');
+            const domId = 'file-' + Array.from(new TextEncoder().encode(fileItem.name)).map(b => b.toString(16)).join('');
             try {
                 const file = await fileItem.handle.getFile();
                 const buffer = await file.arrayBuffer();
@@ -182,9 +213,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 break;
             }
 
+            if (offset + 2 > buffer.byteLength) break;
             let marker = view.getUint16(offset);
 
             if (marker === 0xFFDA) { // SOS (Start of Scan)
+                if (offset + 4 > buffer.byteLength) break;
                 let sosLen = view.getUint16(offset + 2);
                 offset += 2 + sosLen;
 
@@ -214,6 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 );
 
                 if (hasLengthMarker) {
+                    if (offset + 4 > buffer.byteLength) break;
                     let len = view.getUint16(offset + 2);
 
                     // Check if it is APP2 MPF block

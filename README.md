@@ -3,7 +3,7 @@
 A fast, fully local, in-browser tool to detect and safely remove Multi-Picture Format (MPF) headers and trailers from JPEG files without any quality loss.
 
 ## The Problem
-Sometimes JPEGs created by certain cameras (or exported from certain software) include Multi-Picture Format data. When uploading these specific files to platforms like Google Photos, it can trigger severe, unintended compression issues because the platform attempts to process the secondary/depth images embedded in the file. 
+Sometimes JPEGs created by certain cameras (or exported from certain software) include Multi-Picture Format data. When uploading these specific files to platforms like Google Photos, it can trigger severe, unintended compression issues.
 
 ## The Solution
 This tool scans your chosen folders directly in your browser, finds any JPEG files containing MPF data, and strips out the extra data, leaving the original primary image completely untouched and unmodified in quality.
@@ -29,4 +29,6 @@ This is a plain HTML/JS/CSS tool requiring no build steps.
 To run locally, simply serve the directory with any local web server:
 ```bash
 npx serve .
+OR
+python -m "http.server"
 ```
