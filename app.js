@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     const selectDirBtn = document.getElementById('selectDirBtn');
     const cleanBtn = document.getElementById('cleanBtn');
     const statusText = document.getElementById('statusText');
@@ -22,11 +22,73 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
+    // DB Helpers for persistent folder handles
+    const dbPromise = new Promise((resolve, reject) => {
+        const req = indexedDB.open('mpf-store', 1);
+        req.onupgradeneeded = e => e.target.result.createObjectStore('handles');
+        req.onsuccess = e => resolve(e.target.result);
+        req.onerror = () => reject(req.error);
+    });
+
+    async function saveHandle(handle) {
+        const db = await dbPromise;
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('handles', 'readwrite');
+            tx.objectStore('handles').put(handle, 'lastDir');
+            tx.oncomplete = resolve;
+            tx.onerror = () => reject(tx.error);
+        });
+    }
+
+    async function loadHandle() {
+        const db = await dbPromise;
+        return new Promise((resolve, reject) => {
+            const tx = db.transaction('handles', 'readonly');
+            const req = tx.objectStore('handles').get('lastDir');
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null); // safely fail
+        });
+    }
+
+    // Attempt to restore previous folder automatically
+    try {
+        const lastHandle = await loadHandle();
+        if (lastHandle) {
+            directoryHandle = lastHandle;
+            const permission = await lastHandle.queryPermission({ mode: 'readwrite' });
+
+            if (permission === 'granted') {
+                scanDirectory(directoryHandle);
+            } else {
+                try {
+                    // This will almost certainly throw a "must handle user gesture" DOMException,
+                    // but we try it anyway in case the browser allows it.
+                    if (await lastHandle.requestPermission({ mode: 'readwrite' }) === 'granted') {
+                        scanDirectory(directoryHandle);
+                    }
+                } catch (err) {
+                    // Fallback to a text link since we cannot prompt without a user gesture.
+                    statusText.innerHTML = `Found previous folder <b id="resumeName"></b>. <a href="#" id="resumeLink" style="color:#6366f1;text-decoration:underline;cursor:pointer;">Click here to resume</a>.`;
+                    document.getElementById('resumeName').textContent = lastHandle.name;
+                    document.getElementById('resumeLink').addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        if (await lastHandle.requestPermission({ mode: 'readwrite' }) === 'granted') {
+                            scanDirectory(directoryHandle);
+                        }
+                    });
+                }
+            }
+        }
+    } catch (e) {
+        console.error("Could not load previous folder", e);
+    }
+
     selectDirBtn.addEventListener('click', async () => {
         try {
             directoryHandle = await window.showDirectoryPicker({
                 mode: 'readwrite'
             });
+            await saveHandle(directoryHandle);
             await scanDirectory(directoryHandle);
         } catch (err) {
             if (err.name !== 'AbortError') {
