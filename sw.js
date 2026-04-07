@@ -34,15 +34,18 @@ self.addEventListener('fetch', event => {
     event.respondWith(
         caches.match(event.request).then(cachedResponse => {
             const fetchPromise = fetch(event.request).then(networkResponse => {
+                // Clone the response synchronously before the body gets consumed
+                const responseToCache = networkResponse.clone();
+
                 // Update the cache with the new version from the network
                 caches.open(CACHE_NAME).then(cache => {
-                    cache.put(event.request, networkResponse.clone());
+                    cache.put(event.request, responseToCache);
                 });
                 return networkResponse;
             }).catch(() => {
                 console.error("Failed to fetch", event.request.url);
             });
-            
+
             // Return the cached response immediately if available, 
             // otherwise wait for the network response.
             return cachedResponse || fetchPromise;

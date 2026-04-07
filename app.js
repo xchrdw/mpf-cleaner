@@ -82,18 +82,16 @@ document.addEventListener('DOMContentLoaded', () => {
             const file = await fileHandle.getFile();
             const buffer = await file.arrayBuffer();
             
-            let mpfData = detectMPF(buffer);
+            let mpfData = detectMPF(buffer, false);
             if (mpfData.hasMpf) {
                 filesWithMpf.push({
                     handle: fileHandle,
                     name: path + file.name,
-                    buffer: mpfData.data, // This is the processed buffer ready to be written
-                    originalSize: buffer.byteLength,
-                    newSize: mpfData.data.byteLength
+                    originalSize: buffer.byteLength
                 });
                 
                 const li = document.createElement('li');
-                li.id = 'file-' + btoa(unescape(encodeURIComponent(fileHandle.name))).replace(/[^a-zA-Z0-9]/g, '');
+                li.id = 'file-' + Array.from(new TextEncoder().encode(fileHandle.name)).map(b => b.toString(16)).join('');
                 li.innerHTML = `
                     <span class="file-name">${path}${file.name}</span>
                     <span class="file-badge">Has MPF</span>
@@ -115,11 +113,19 @@ document.addEventListener('DOMContentLoaded', () => {
         
         for (let i = 0; i < filesToProcess.length; i++) {
             const fileItem = filesToProcess[i];
-            const domId = 'file-' + btoa(unescape(encodeURIComponent(fileItem.handle.name))).replace(/[^a-zA-Z0-9]/g, '');
+            const domId = 'file-' + Array.from(new TextEncoder().encode(fileItem.handle.name)).map(b => b.toString(16)).join('');
             try {
-                const writable = await fileItem.handle.createWritable();
-                await writable.write(fileItem.buffer);
-                await writable.close();
+                const file = await fileItem.handle.getFile();
+                const buffer = await file.arrayBuffer();
+                const cleanData = detectMPF(buffer, true);
+                
+                if (cleanData.hasMpf && cleanData.data) {
+                    const writable = await fileItem.handle.createWritable();
+                    await writable.write(cleanData.data);
+                    await writable.close();
+                } else {
+                    throw new Error("File changed or no MPF data found during cleanup.");
+                }
                 
                 // Update UI
                 const li = document.getElementById(domId);
@@ -151,7 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
      * Parses a JPEG ArrayBuffer, detects MPF data, and immediately returns a new clean buffer
      * if MPF or extra trailer data is present.
      */
-    function detectMPF(buffer) {
+    function detectMPF(buffer, returnCleaned = false) {
         const view = new DataView(buffer);
         const bytes = new Uint8Array(buffer);
         const chunks = [];
@@ -195,6 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 if (offset < buffer.byteLength) {
                     modified = true; // Dropping the trailer which includes the MPF extra files
+                    if (!returnCleaned) return { hasMpf: true };
                 }
                 break; // We're done with the primary image!
                 
@@ -214,6 +221,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             bytes[offset + 6] === 0x46 && bytes[offset + 7] === 0x00) {
                             
                             modified = true;
+                            if (!returnCleaned) return { hasMpf: true };
                             // Push everything read so far
                             if (offset > currentChunkStart) {
                                 chunks.push(bytes.subarray(currentChunkStart, offset));
