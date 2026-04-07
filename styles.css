@@ -22,6 +22,7 @@ body {
     background-color: var(--bg-dark);
     color: var(--text-primary);
     min-height: 100vh;
+    min-height: 100svh; /* Prevents phantom scrolling from mobile browser UI */
     display: flex;
     justify-content: center;
     align-items: center;
@@ -86,6 +87,7 @@ header h1 {
     margin-bottom: 10px;
     background: linear-gradient(to right, #38bdf8, #818cf8);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
 }
 
