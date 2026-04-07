@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MPF Data Cleaner</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="background-elements">
+        <div class="blob blob-1"></div>
+        <div class="blob blob-2"></div>
+    </div>
+    
+    <div class="glass-container">
+        <header>
+            <h1>MPF Data Cleaner</h1>
+            <p>Select a folder to detect and safely remove Multi-Picture Format (MPF) headers and trailers from JPEG files without quality loss. This fixes upload compression issues with Google Photos.</p>
+        </header>
+
+        <div class="controls">
+            <button id="selectDirBtn" class="primary-btn">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+                Select Folder
+            </button>
+            <button id="cleanBtn" class="warning-btn" disabled>
+                Clean MPF Data
+            </button>
+        </div>
+
+        <div class="status-panel" id="statusPanel">
+            <p id="statusText">Waiting for folder selection...</p>
+            <div class="progress-bar-container" style="display: none;" id="progressContainer">
+                <div class="progress-bar" id="progressBar"></div>
+            </div>
+        </div>
+
+        <div class="results-area">
+            <div class="stats-row" id="statsRow" style="display: none;">
+                <div class="stat-box">
+                    <span class="stat-val" id="totalFiles">0</span>
+                    <span class="stat-label">JPGs Scanned</span>
+                </div>
+                <div class="stat-box warning-box">
+                    <span class="stat-val" id="mpfFiles">0</span>
+                    <span class="stat-label">Contain MPF</span>
+                </div>
+            </div>
+
+            <div class="file-list-container">
+                <ul id="fileList" class="file-list">
+                    <!-- Dynamic list inserted here -->
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "name": "mpf-cleaner",
+  "version": "1.0.0",
+  "description": "Removes MPF data from JPEGs locally in the browser",
+  "scripts": {
+    "start": "npx serve ."
+  }
+}
