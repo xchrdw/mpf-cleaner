@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
             const file = await fileHandle.getFile();
             const buffer = await file.arrayBuffer();
-            
+
             let mpfData = detectMPF(buffer, false);
             if (mpfData.hasMpf) {
                 filesWithMpf.push({
@@ -89,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     name: path + file.name,
                     originalSize: buffer.byteLength
                 });
-                
+
                 const li = document.createElement('li');
                 li.id = 'file-' + Array.from(new TextEncoder().encode(fileHandle.name)).map(b => b.toString(16)).join('');
                 li.innerHTML = `
@@ -97,7 +97,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span class="file-badge">Has MPF</span>
                 `;
                 fileListEl.appendChild(li);
-                
+
                 mpfFilesEl.innerText = filesWithMpf.length;
             }
         } catch (e) {
@@ -110,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         cleanBtn.disabled = true;
         selectDirBtn.disabled = true;
         progressContainer.style.display = 'block';
-        
+
         for (let i = 0; i < filesToProcess.length; i++) {
             const fileItem = filesToProcess[i];
             const domId = 'file-' + Array.from(new TextEncoder().encode(fileItem.handle.name)).map(b => b.toString(16)).join('');
@@ -118,7 +118,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const file = await fileItem.handle.getFile();
                 const buffer = await file.arrayBuffer();
                 const cleanData = detectMPF(buffer, true);
-                
+
                 if (cleanData.hasMpf && cleanData.data) {
                     const writable = await fileItem.handle.createWritable();
                     await writable.write(cleanData.data);
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 } else {
                     throw new Error("File changed or no MPF data found during cleanup.");
                 }
-                
+
                 // Update UI
                 const li = document.getElementById(domId);
                 if (li) {
@@ -144,8 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     badge.innerText = 'Error';
                 }
             }
-            
+
             progressBar.style.width = `${((i + 1) / filesToProcess.length) * 100}%`;
+            statusText.innerText = `Cleaning files... (${i + 1}/${filesToProcess.length} completed)`;
         }
 
         statusText.innerText = `Finished cleaning ${filesToProcess.length} files.`;
@@ -161,65 +162,65 @@ document.addEventListener('DOMContentLoaded', () => {
         const view = new DataView(buffer);
         const bytes = new Uint8Array(buffer);
         const chunks = [];
-        
+
         if (buffer.byteLength < 4 || view.getUint16(0) !== 0xFFD8) {
-             return { hasMpf: false };
+            return { hasMpf: false };
         }
-        
+
         let offset = 2;
         let modified = false;
         let currentChunkStart = 0;
-        
+
         while (offset < buffer.byteLength - 1) {
             // Find next marker, skipping padding
             while (offset < buffer.byteLength - 1 && bytes[offset] === 0xFF && bytes[offset + 1] === 0xFF) {
                 offset++;
             }
-            
+
             if (bytes[offset] !== 0xFF) {
                 // Lost sync, likely corrupted JPEG, stop parsing cleanly.
                 break;
             }
-            
+
             let marker = view.getUint16(offset);
-            
+
             if (marker === 0xFFDA) { // SOS (Start of Scan)
                 let sosLen = view.getUint16(offset + 2);
                 offset += 2 + sosLen;
-                
+
                 // Fast forward scanning for EOI (FF D9) marker in the stream.
                 while (offset < buffer.byteLength - 1) {
                     // Valid EOI in stream is FF D9 since image data escapes FF as FF 00.
-                    if (bytes[offset] === 0xFF && bytes[offset+1] === 0xD9) {
+                    if (bytes[offset] === 0xFF && bytes[offset + 1] === 0xD9) {
                         offset += 2; // Include EOI
                         break;
                     }
                     offset++;
                 }
-                
+
                 chunks.push(bytes.subarray(currentChunkStart, offset));
-                
+
                 if (offset < buffer.byteLength) {
                     modified = true; // Dropping the trailer which includes the MPF extra files
                     if (!returnCleaned) return { hasMpf: true };
                 }
                 break; // We're done with the primary image!
-                
+
             } else {
                 let hasLengthMarker = (
                     (marker >= 0xFFE0 && marker <= 0xFFFE) || // APPn, COM
                     (marker >= 0xFFC0 && marker <= 0xFFCF && marker !== 0xFFC8) || // SOFn
                     marker === 0xFFDB || marker === 0xFFC4 || marker === 0xFFCC || marker === 0xFFDD
                 );
-                
+
                 if (hasLengthMarker) {
                     let len = view.getUint16(offset + 2);
-                    
+
                     // Check if it is APP2 MPF block
                     if (marker === 0xFFE2 && len >= 6) {
-                        if (bytes[offset + 4] === 0x4D && bytes[offset + 5] === 0x50 && 
+                        if (bytes[offset + 4] === 0x4D && bytes[offset + 5] === 0x50 &&
                             bytes[offset + 6] === 0x46 && bytes[offset + 7] === 0x00) {
-                            
+
                             modified = true;
                             if (!returnCleaned) return { hasMpf: true };
                             // Push everything read so far
@@ -239,22 +240,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         }
-        
+
         if (!modified) {
             return { hasMpf: false };
         }
-        
+
         // Assemble cleaned buffer
         let totalLength = 0;
         for (let c of chunks) totalLength += c.length;
-        
+
         let newBytes = new Uint8Array(totalLength);
         let p = 0;
         for (let c of chunks) {
             newBytes.set(c, p);
             p += c.length;
         }
-        
+
         return { hasMpf: true, data: newBytes.buffer };
     }
 });
